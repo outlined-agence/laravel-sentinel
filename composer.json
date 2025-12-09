@@ -1,0 +1,80 @@
+{
+    "name": "outlined/laravel-sentinel",
+    "description": "Centralized application monitoring with Slack/Discord notifications for Laravel",
+    "keywords": [
+        "laravel",
+        "monitoring",
+        "slack",
+        "discord",
+        "logging",
+        "alerts",
+        "sentry",
+        "exceptions"
+    ],
+    "homepage": "https://github.com/outlined/laravel-sentinel",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Outlined",
+            "email": "contact@outlined.io"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/contracts": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/cache": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/log": "^10.0|^11.0|^12.0",
+        "monolog/monolog": "^3.0",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "nunomaduro/collision": "^7.0|^8.0",
+        "orchestra/testbench": "^8.0|^9.0",
+        "pestphp/pest": "^2.0",
+        "pestphp/pest-plugin-laravel": "^2.0",
+        "phpstan/phpstan": "^1.10",
+        "sentry/sentry-laravel": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Outlined\\Sentinel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Outlined\\Sentinel\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "analyse": "vendor/bin/phpstan analyse",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Outlined\\Sentinel\\SentinelServiceProvider"
+            ],
+            "aliases": {
+                "Sentinel": "Outlined\\Sentinel\\Facades\\Sentinel"
+            }
+        }
+    },
+    "suggest": {
+        "sentry/sentry-laravel": "Required for Sentry integration",
+        "filament/filament": "Required for the monitoring dashboard",
+        "promphp/prometheus_client_php": "Required for Prometheus metrics"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
