@@ -52,6 +52,9 @@ class SlackHandler extends AbstractProcessingHandler
         int $timeout = 5,
         Level $level = Level::Warning,
         bool $bubble = true,
+        ?Client $client = null,
+        ?AlertDeduplicator $deduplicator = null,
+        ?RateLimiter $rateLimiter = null,
     ) {
         parent::__construct($level, $bubble);
 
@@ -63,9 +66,9 @@ class SlackHandler extends AbstractProcessingHandler
         $this->mentionOnLevels = $mentionOnLevels;
         $this->timeout = $timeout;
 
-        $this->client = new Client(['timeout' => $timeout]);
-        $this->deduplicator = new AlertDeduplicator();
-        $this->rateLimiter = new RateLimiter();
+        $this->client = $client ?? new Client(['timeout' => $timeout]);
+        $this->deduplicator = $deduplicator ?? app(AlertDeduplicator::class);
+        $this->rateLimiter = $rateLimiter ?? app(RateLimiter::class);
 
         $this->colors = config('sentinel.formatting.colors', [
             'debug' => '#808080',
@@ -101,8 +104,8 @@ class SlackHandler extends AbstractProcessingHandler
             return;
         }
 
-        // Check rate limiting
-        if (! $this->rateLimiter->allow('slack')) {
+        // Check rate limiting (atomic check + increment)
+        if (! $this->rateLimiter->attempt('slack')) {
             return;
         }
 
@@ -111,7 +114,6 @@ class SlackHandler extends AbstractProcessingHandler
             $this->client->post($this->webhookUrl, [
                 'json' => $payload,
             ]);
-            $this->rateLimiter->hit('slack');
         } catch (GuzzleException|Throwable) {
             // Fail silently to not block the application
         }
@@ -222,10 +224,11 @@ class SlackHandler extends AbstractProcessingHandler
                 if ($key === 'dedup_key') {
                     continue;
                 }
+                $formatted = $this->formatValue($value);
                 $mainAttachment['fields'][] = [
                     'title' => ucfirst(str_replace('_', ' ', $key)),
-                    'value' => $this->formatValue($value),
-                    'short' => strlen($this->formatValue($value)) < 40,
+                    'value' => strlen($formatted) > 1024 ? substr($formatted, 0, 1021) . '...' : $formatted,
+                    'short' => strlen($formatted) < 40,
                 ];
             }
         }
@@ -278,6 +281,10 @@ class SlackHandler extends AbstractProcessingHandler
         // Add stack trace as code block
         if (config('sentinel.formatting.include_stack_trace', true) && ! empty($exception['trace'])) {
             $traceText = $this->formatStackTrace($exception['trace']);
+            // Slack also has field value limits
+            if (strlen($traceText) > 1000) {
+                $traceText = substr($traceText, 0, 997) . '...';
+            }
             $attachment['fields'][] = [
                 'title' => 'Stack Trace',
                 'value' => "```\n{$traceText}\n```",

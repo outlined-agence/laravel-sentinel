@@ -14,6 +14,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Async Notifications
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, Slack/Discord notifications are dispatched via queue
+    | instead of being sent synchronously. This prevents webhook timeouts
+    | from blocking your application requests.
+    |
+    */
+    'async' => [
+        'enabled' => env('SENTINEL_ASYNC_ENABLED', false),
+        'queue' => env('SENTINEL_ASYNC_QUEUE', null),
+        'connection' => env('SENTINEL_ASYNC_CONNECTION', null),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Database Storage
     |--------------------------------------------------------------------------
     |
@@ -221,6 +237,39 @@ return [
             'host' => env('SENTINEL_STATSD_HOST', '127.0.0.1'),
             'port' => env('SENTINEL_STATSD_PORT', 8125),
             'protocol' => env('SENTINEL_STATSD_PROTOCOL', 'udp'), // udp, tcp
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Context Sanitization
+    |--------------------------------------------------------------------------
+    |
+    | Mask sensitive data before sending context to external webhooks
+    | (Slack, Discord). Database storage keeps the original context.
+    |
+    */
+    'sanitization' => [
+        'enabled' => env('SENTINEL_SANITIZATION_ENABLED', true),
+        'mask' => '********',
+        'fields' => [
+            'password',
+            'password_confirmation',
+            'secret',
+            'token',
+            'api_key',
+            'api_secret',
+            'access_token',
+            'refresh_token',
+            'credit_card',
+            'card_number',
+            'cvv',
+            'ssn',
+            'authorization',
+        ],
+        'patterns' => [
+            // Add custom regex patterns to mask, e.g.:
+            // '/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/i',
         ],
     ],
 
