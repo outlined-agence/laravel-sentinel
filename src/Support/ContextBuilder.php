@@ -147,9 +147,15 @@ class ContextBuilder
     /**
      * @return array<string, mixed>
      */
-    protected function getExceptionContext(Throwable $exception): array
+    protected function getExceptionContext(Throwable $exception, int $depth = 0): array
     {
+        $maxPreviousDepth = 3;
         $trace = $this->getStackTrace($exception);
+
+        $previous = null;
+        if ($exception->getPrevious() && $depth < $maxPreviousDepth) {
+            $previous = $this->getExceptionContext($exception->getPrevious(), $depth + 1);
+        }
 
         return [
             'class' => get_class($exception),
@@ -158,7 +164,7 @@ class ContextBuilder
             'file' => $exception->getFile(),
             'line' => $exception->getLine(),
             'trace' => $trace,
-            'previous' => $exception->getPrevious() ? $this->getExceptionContext($exception->getPrevious()) : null,
+            'previous' => $previous,
         ];
     }
 

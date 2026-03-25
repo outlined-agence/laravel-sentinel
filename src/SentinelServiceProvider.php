@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Outlined\Sentinel;
 
-use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Outlined\Sentinel\Commands\CheckResourcesCommand;
@@ -21,6 +20,7 @@ use Outlined\Sentinel\Services\MonitoringService;
 use Outlined\Sentinel\Filament\FilamentVersion;
 use Outlined\Sentinel\Support\AlertDeduplicator;
 use Outlined\Sentinel\Support\ContextBuilder;
+use Outlined\Sentinel\Support\ContextSanitizer;
 use Outlined\Sentinel\Support\RateLimiter;
 use Livewire\Livewire;
 
@@ -44,6 +44,9 @@ class SentinelServiceProvider extends ServiceProvider
         // Register RateLimiter
         $this->app->singleton(RateLimiter::class);
 
+        // Register ContextSanitizer
+        $this->app->singleton(ContextSanitizer::class);
+
         // Register MetricsCollector
         $this->app->singleton(MetricsCollector::class, function () {
             if (! config('sentinel.metrics.enabled')) {
@@ -61,7 +64,10 @@ class SentinelServiceProvider extends ServiceProvider
 
         // Register MonitoringService as singleton
         $this->app->singleton(MonitoringService::class, function ($app) {
-            $service = new MonitoringService($app[ContextBuilder::class]);
+            $service = new MonitoringService(
+                $app[ContextBuilder::class],
+                $app[ContextSanitizer::class],
+            );
             $service->setMetricsCollector($app[MetricsCollector::class]);
 
             return $service;
@@ -198,20 +204,4 @@ class SentinelServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * Get the services provided by the provider.
-     *
-     * @return array<int, string>
-     */
-    public function provides(): array
-    {
-        return [
-            MonitoringService::class,
-            ContextBuilder::class,
-            AlertDeduplicator::class,
-            RateLimiter::class,
-            ResourceChecker::class,
-            MetricsCollector::class,
-        ];
-    }
 }

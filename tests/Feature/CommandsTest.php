@@ -49,13 +49,11 @@ it('can run prune command with no events', function () {
 it('can run prune command with dry run', function () {
     $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
 
-    // Create an old event
-    SentinelEvent::create([
-        'level' => 'error',
-        'message' => 'Old error',
-        'created_at' => now()->subDays(60),
-        'updated_at' => now()->subDays(60),
-    ]);
+    // Create an old event (bypass mass assignment for timestamps)
+    $event = new SentinelEvent(['level' => 'error', 'message' => 'Old error']);
+    $event->created_at = now()->subDays(60);
+    $event->updated_at = now()->subDays(60);
+    $event->save();
 
     $this->artisan('sentinel:prune', ['--dry-run' => true])
         ->expectsOutputToContain('Would delete')
@@ -67,19 +65,16 @@ it('can run prune command with dry run', function () {
 it('prunes old events', function () {
     $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
 
-    // Create old and new events
-    SentinelEvent::create([
-        'level' => 'error',
-        'message' => 'Old error',
-        'created_at' => now()->subDays(60),
-        'updated_at' => now()->subDays(60),
-    ]);
+    // Create old event (bypass mass assignment for timestamps)
+    $oldEvent = new SentinelEvent(['level' => 'error', 'message' => 'Old error']);
+    $oldEvent->created_at = now()->subDays(60);
+    $oldEvent->updated_at = now()->subDays(60);
+    $oldEvent->save();
 
+    // Create recent event
     SentinelEvent::create([
         'level' => 'error',
         'message' => 'Recent error',
-        'created_at' => now(),
-        'updated_at' => now(),
     ]);
 
     expect(SentinelEvent::count())->toBe(2);
