@@ -49,6 +49,9 @@ class DiscordHandler extends AbstractProcessingHandler
         int $timeout = 5,
         Level $level = Level::Warning,
         bool $bubble = true,
+        ?Client $client = null,
+        ?AlertDeduplicator $deduplicator = null,
+        ?RateLimiter $rateLimiter = null,
     ) {
         parent::__construct($level, $bubble);
 
@@ -59,9 +62,9 @@ class DiscordHandler extends AbstractProcessingHandler
         $this->mentionOnLevels = $mentionOnLevels;
         $this->timeout = $timeout;
 
-        $this->client = new Client(['timeout' => $timeout]);
-        $this->deduplicator = new AlertDeduplicator();
-        $this->rateLimiter = new RateLimiter();
+        $this->client = $client ?? new Client(['timeout' => $timeout]);
+        $this->deduplicator = $deduplicator ?? app(AlertDeduplicator::class);
+        $this->rateLimiter = $rateLimiter ?? app(RateLimiter::class);
 
         // Discord colors are decimal integers
         $this->colors = [
@@ -98,8 +101,8 @@ class DiscordHandler extends AbstractProcessingHandler
             return;
         }
 
-        // Check rate limiting
-        if (! $this->rateLimiter->allow('discord')) {
+        // Check rate limiting (atomic check + increment)
+        if (! $this->rateLimiter->attempt('discord')) {
             return;
         }
 
@@ -108,7 +111,6 @@ class DiscordHandler extends AbstractProcessingHandler
             $this->client->post($this->webhookUrl, [
                 'json' => $payload,
             ]);
-            $this->rateLimiter->hit('discord');
         } catch (GuzzleException|Throwable) {
             // Fail silently to not block the application
         }

@@ -22,8 +22,11 @@ class StatsdCollector implements MetricsCollector
 
     protected string $prefix;
 
+    /** @var \Socket|resource|null */
+    protected $udpSocket = null;
+
     /** @var resource|null */
-    protected $socket = null;
+    protected $tcpSocket = null;
 
     public function __construct()
     {
@@ -35,27 +38,31 @@ class StatsdCollector implements MetricsCollector
 
     public function increment(string $name, array $labels = [], float $value = 1): void
     {
-        $metricName = $this->buildMetricName($name, $labels);
-        $this->send("{$metricName}:{$value}|c");
+        $metricName = $this->buildMetricName($name);
+        $tags = $this->buildTags($labels);
+        $this->send("{$metricName}:{$value}|c{$tags}");
     }
 
     public function gauge(string $name, float $value, array $labels = []): void
     {
-        $metricName = $this->buildMetricName($name, $labels);
-        $this->send("{$metricName}:{$value}|g");
+        $metricName = $this->buildMetricName($name);
+        $tags = $this->buildTags($labels);
+        $this->send("{$metricName}:{$value}|g{$tags}");
     }
 
     public function histogram(string $name, float $value, array $labels = [], ?array $buckets = null): void
     {
         // StatsD doesn't have native histograms, use timing instead
-        $metricName = $this->buildMetricName($name, $labels);
-        $this->send("{$metricName}:{$value}|h");
+        $metricName = $this->buildMetricName($name);
+        $tags = $this->buildTags($labels);
+        $this->send("{$metricName}:{$value}|h{$tags}");
     }
 
     public function timing(string $name, float $milliseconds, array $labels = []): void
     {
-        $metricName = $this->buildMetricName($name, $labels);
-        $this->send("{$metricName}:{$milliseconds}|ms");
+        $metricName = $this->buildMetricName($name);
+        $tags = $this->buildTags($labels);
+        $this->send("{$metricName}:{$milliseconds}|ms{$tags}");
     }
 
     public function render(): string
@@ -65,24 +72,30 @@ class StatsdCollector implements MetricsCollector
     }
 
     /**
-     * Build a metric name with labels.
+     * Build a metric name (without tags).
+     */
+    protected function buildMetricName(string $name): string
+    {
+        return $this->prefix . '.' . $name;
+    }
+
+    /**
+     * Build DogStatsD tags string from labels.
      *
      * @param  array<string, string>  $labels
      */
-    protected function buildMetricName(string $name, array $labels): string
+    protected function buildTags(array $labels): string
     {
-        $fullName = $this->prefix . '.' . $name;
-
-        // Append labels as tags (StatsD DogStatsD format)
-        if (! empty($labels)) {
-            $tags = [];
-            foreach ($labels as $key => $value) {
-                $tags[] = "{$key}:{$value}";
-            }
-            $fullName .= '|#' . implode(',', $tags);
+        if (empty($labels)) {
+            return '';
         }
 
-        return $fullName;
+        $tags = [];
+        foreach ($labels as $key => $value) {
+            $tags[] = "{$key}:{$value}";
+        }
+
+        return '|#' . implode(',', $tags);
     }
 
     /**
@@ -102,41 +115,48 @@ class StatsdCollector implements MetricsCollector
     }
 
     /**
-     * Send via UDP.
+     * Send via UDP (reuses socket across calls).
      */
     protected function sendUdp(string $message): void
     {
-        $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+        if ($this->udpSocket === null) {
+            $this->udpSocket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 
-        if ($socket === false) {
-            return;
+            if ($this->udpSocket === false) {
+                $this->udpSocket = null;
+
+                return;
+            }
         }
 
-        socket_sendto($socket, $message, strlen($message), 0, $this->host, $this->port);
-        socket_close($socket);
+        socket_sendto($this->udpSocket, $message, strlen($message), 0, $this->host, $this->port);
     }
 
     /**
-     * Send via TCP.
+     * Send via TCP (reuses socket across calls).
      */
     protected function sendTcp(string $message): void
     {
-        if ($this->socket === null) {
-            $this->socket = @fsockopen($this->host, $this->port, $errno, $errstr, 1);
+        if ($this->tcpSocket === null) {
+            $this->tcpSocket = @fsockopen($this->host, $this->port, $errno, $errstr, 1);
         }
 
-        if ($this->socket !== false && $this->socket !== null) {
-            fwrite($this->socket, $message . "\n");
+        if ($this->tcpSocket !== false && $this->tcpSocket !== null) {
+            fwrite($this->tcpSocket, $message . "\n");
         }
     }
 
     /**
-     * Close the TCP connection.
+     * Close open connections.
      */
     public function __destruct()
     {
-        if ($this->socket !== null && $this->socket !== false) {
-            fclose($this->socket);
+        if ($this->udpSocket !== null) {
+            socket_close($this->udpSocket);
+        }
+
+        if ($this->tcpSocket !== null && $this->tcpSocket !== false) {
+            fclose($this->tcpSocket);
         }
     }
 }

@@ -54,15 +54,20 @@ class PruneEventsCommand extends Command
 
         $this->info("Pruning {$count} events older than {$days} days...");
 
-        // Delete in chunks to avoid memory issues
+        // Delete in batches by ID to avoid memory issues
         $deleted = 0;
-        SentinelEvent::where('created_at', '<=', $cutoff)
-            ->chunkById(1000, function ($events) use (&$deleted) {
-                foreach ($events as $event) {
-                    $event->delete();
-                    $deleted++;
-                }
-            });
+        do {
+            $ids = SentinelEvent::where('created_at', '<=', $cutoff)
+                ->limit(1000)
+                ->pluck('id');
+
+            if ($ids->isEmpty()) {
+                break;
+            }
+
+            $batch = SentinelEvent::whereIn('id', $ids)->delete();
+            $deleted += $batch;
+        } while ($batch > 0);
 
         $this->info("Successfully pruned {$deleted} events.");
 

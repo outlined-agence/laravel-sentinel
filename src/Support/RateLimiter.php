@@ -55,6 +55,49 @@ class RateLimiter
     }
 
     /**
+     * Atomically check rate limit and increment if allowed.
+     *
+     * Returns true if the notification is allowed (and counters are incremented).
+     * This prevents TOCTOU race conditions between allow() and hit().
+     */
+    public function attempt(string $channel): bool
+    {
+        if (! $this->enabled) {
+            return true;
+        }
+
+        $minuteKey = $this->getMinuteKey($channel);
+        $hourKey = $this->getHourKey($channel);
+
+        $minuteCount = $this->incrementCounter($minuteKey, 60);
+        $hourCount = $this->incrementCounter($hourKey, 3600);
+
+        if ($minuteCount > $this->maxPerMinute) {
+            return false;
+        }
+
+        if ($hourCount > $this->maxPerHour) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Atomically increment a counter, initializing it if needed.
+     */
+    protected function incrementCounter(string $key, int $ttl): int
+    {
+        if (! $this->cache->has($key)) {
+            $this->cache->put($key, 1, $ttl);
+
+            return 1;
+        }
+
+        return (int) $this->cache->increment($key);
+    }
+
+    /**
      * Record a notification being sent.
      */
     public function hit(string $channel): void

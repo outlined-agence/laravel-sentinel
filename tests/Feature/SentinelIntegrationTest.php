@@ -84,8 +84,8 @@ it('logs threshold alert to database', function () {
 
     $event = SentinelEvent::first();
     expect($event->level)->toBe('warning');
-    expect($event->context['data']['current_value'])->toBe(50.00);
-    expect($event->context['data']['threshold'])->toBe(100.00);
+    expect((float) $event->context['data']['current_value'])->toBe(50.00);
+    expect((float) $event->context['data']['threshold'])->toBe(100.00);
 });
 
 it('dispatches event when logging', function () {

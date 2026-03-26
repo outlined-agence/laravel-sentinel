@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Outlined\Sentinel\Contracts\MetricsCollector;
 use Outlined\Sentinel\Events\MonitoringEventLogged;
+use Outlined\Sentinel\Jobs\SendWebhookNotification;
 use Outlined\Sentinel\Models\SentinelEvent;
 use Outlined\Sentinel\Support\ContextBuilder;
+use Outlined\Sentinel\Support\ContextSanitizer;
 use Throwable;
 
 class MonitoringService
@@ -18,15 +20,18 @@ class MonitoringService
 
     protected ContextBuilder $contextBuilder;
 
+    protected ContextSanitizer $sanitizer;
+
     protected ?MetricsCollector $metrics = null;
 
     protected bool $databaseEnabled;
 
-    public function __construct(ContextBuilder $contextBuilder)
+    public function __construct(ContextBuilder $contextBuilder, ?ContextSanitizer $sanitizer = null)
     {
         $this->enabled = config('sentinel.enabled', true);
         $this->databaseEnabled = config('sentinel.database.enabled', false);
         $this->contextBuilder = $contextBuilder;
+        $this->sanitizer = $sanitizer ?? new ContextSanitizer();
 
         // Register custom context extractors
         $extractors = config('sentinel.context_extractors', []);
@@ -200,11 +205,51 @@ class MonitoringService
     }
 
     /**
-     * Log to Slack channel.
+     * Log to configured notification channels.
      *
      * @param  array<string, mixed>  $context
      */
     protected function logToChannels(string $level, string $message, array $context): void
+    {
+        $hasSlack = config('sentinel.slack.enabled', true) && config('sentinel.slack.webhook_url');
+        $hasDiscord = config('sentinel.discord.enabled', false) && config('sentinel.discord.webhook_url');
+
+        if (! $hasSlack && ! $hasDiscord) {
+            return;
+        }
+
+        // Sanitize context before sending to external webhooks
+        $sanitizedContext = $this->sanitizer->sanitize($context);
+
+        // Dispatch async via queue if enabled
+        if (config('sentinel.async.enabled', false)) {
+            $job = new SendWebhookNotification($level, $message, $sanitizedContext);
+
+            $queue = config('sentinel.async.queue');
+            if ($queue) {
+                $job->onQueue($queue);
+            }
+
+            $connection = config('sentinel.async.connection');
+            if ($connection) {
+                $job->onConnection($connection);
+            }
+
+            dispatch($job);
+
+            return;
+        }
+
+        // Synchronous sending
+        $this->sendToChannels($level, $message, $sanitizedContext);
+    }
+
+    /**
+     * Send notifications synchronously to configured channels.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    protected function sendToChannels(string $level, string $message, array $context): void
     {
         // Log to Slack
         if (config('sentinel.slack.enabled', true) && config('sentinel.slack.webhook_url')) {

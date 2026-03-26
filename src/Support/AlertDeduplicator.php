@@ -17,6 +17,14 @@ class AlertDeduplicator
 
     protected bool $enabled;
 
+    /** @var array<string, int> */
+    protected array $customTtls = [];
+
+    /** @var array<string> Keys tracked for clearAll support */
+    protected array $trackedKeys = [];
+
+    protected string $trackingKey = 'sentinel_dedup_keys';
+
     public function __construct()
     {
         $store = config('sentinel.deduplication.cache_store');
@@ -43,12 +51,16 @@ class AlertDeduplicator
             return false;
         }
 
+        $effectiveTtl = $ttl ?? $this->customTtls[$type] ?? $this->defaultTtl;
+
         // Mark as sent
         $this->cache->put($key, [
             'sent_at' => now()->toIso8601String(),
             'type' => $type,
             'message_hash' => md5($message),
-        ], $ttl ?? $this->defaultTtl);
+        ], $effectiveTtl);
+
+        $this->trackKey($key);
 
         return true;
     }
@@ -60,9 +72,9 @@ class AlertDeduplicator
      */
     protected function generateKey(string $type, string $message, array $context = []): string
     {
-        // Use custom dedup key if provided
+        // Use custom dedup key if provided (hashed to prevent cache key injection)
         if (isset($context['dedup_key'])) {
-            return $this->prefix . $context['dedup_key'];
+            return $this->prefix . md5((string) $context['dedup_key']);
         }
 
         // Generate key from type and message hash
@@ -81,13 +93,29 @@ class AlertDeduplicator
     }
 
     /**
-     * Clear all deduplication cache entries.
+     * Clear all tracked deduplication cache entries.
      */
     public function clearAll(): void
     {
-        // Note: This is a simple implementation
-        // For production, consider using cache tags if available
-        // $this->cache->tags([$this->prefix])->flush();
+        $keys = $this->cache->get($this->trackingKey, []);
+
+        foreach ($keys as $key) {
+            $this->cache->forget($key);
+        }
+
+        $this->cache->forget($this->trackingKey);
+    }
+
+    /**
+     * Track a cache key for clearAll support.
+     */
+    protected function trackKey(string $key): void
+    {
+        $keys = $this->cache->get($this->trackingKey, []);
+        $keys[] = $key;
+        // Keep only unique keys and limit the tracking list
+        $keys = array_unique($keys);
+        $this->cache->put($this->trackingKey, $keys, $this->defaultTtl * 2);
     }
 
     /**
@@ -128,19 +156,16 @@ class AlertDeduplicator
     {
         $key = $this->generateKey($type, $message, $context);
 
+        $effectiveTtl = $ttl ?? $this->customTtls[$type] ?? $this->defaultTtl;
+
         $this->cache->put($key, [
             'sent_at' => now()->toIso8601String(),
             'type' => $type,
             'message_hash' => md5($message),
-        ], $ttl ?? $this->defaultTtl);
-    }
+        ], $effectiveTtl);
 
-    /**
-     * Set a custom TTL for specific alert types.
-     *
-     * @var array<string, int>
-     */
-    protected array $customTtls = [];
+        $this->trackKey($key);
+    }
 
     /**
      * Register a custom TTL for a specific alert type.
