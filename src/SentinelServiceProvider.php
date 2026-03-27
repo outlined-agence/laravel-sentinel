@@ -12,6 +12,7 @@ use Outlined\Sentinel\Commands\TestMonitoringCommand;
 use Outlined\Sentinel\Contracts\MetricsCollector;
 use Outlined\Sentinel\Logging\DiscordLogger;
 use Outlined\Sentinel\Logging\SlackLogger;
+use Outlined\Sentinel\Logging\WebhookLogger;
 use Outlined\Sentinel\Metrics\NullMetricsCollector;
 use Outlined\Sentinel\Metrics\PrometheusCollector;
 use Outlined\Sentinel\Metrics\StatsdCollector;
@@ -165,6 +166,13 @@ class SentinelServiceProvider extends ServiceProvider
             'via' => DiscordLogger::class,
             'level' => config('sentinel.discord.level', 'debug'),
         ]);
+
+        // Register Webhook channel
+        $this->app['config']->set('logging.channels.sentinel-webhook', [
+            'driver' => 'custom',
+            'via' => WebhookLogger::class,
+            'level' => config('sentinel.webhook.level', 'debug'),
+        ]);
     }
 
     /**
@@ -223,6 +231,14 @@ class SentinelServiceProvider extends ServiceProvider
 
         if (config('sentinel.discord.enabled') && empty(config('sentinel.discord.webhook_url'))) {
             Log::warning('[Sentinel] Discord is enabled but SENTINEL_DISCORD_WEBHOOK is not set. Discord notifications will not be sent.');
+        }
+
+        if (config('sentinel.webhook.enabled') && empty(config('sentinel.webhook.endpoint_url'))) {
+            Log::warning('[Sentinel] Webhook is enabled but SENTINEL_ENDPOINT is not set. Webhook notifications will not be sent.');
+        }
+
+        if (config('sentinel.webhook.enabled') && empty(config('sentinel.webhook.secret'))) {
+            Log::warning('[Sentinel] Webhook is enabled but SENTINEL_WEBHOOK_SECRET is not set. Webhook notifications will not be sent.');
         }
     }
 }

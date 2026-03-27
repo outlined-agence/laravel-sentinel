@@ -87,6 +87,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Custom Webhook
+    |--------------------------------------------------------------------------
+    |
+    | Send monitoring events to your own endpoint via signed HTTP POST.
+    | Each request includes an X-Sentinel-Signature header (HMAC-SHA256)
+    | so you can verify the payload authenticity on the receiving end.
+    |
+    */
+    'webhook' => [
+        'enabled' => env('SENTINEL_WEBHOOK_ENABLED', false),
+        'endpoint_url' => env('SENTINEL_ENDPOINT'),
+        'secret' => env('SENTINEL_WEBHOOK_SECRET'),
+        'level' => env('SENTINEL_WEBHOOK_LEVEL', 'debug'),
+        'timeout' => 5,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sentry Integration
     |--------------------------------------------------------------------------
     |

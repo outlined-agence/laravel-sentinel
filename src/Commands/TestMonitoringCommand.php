@@ -48,6 +48,9 @@ class TestMonitoringCommand extends Command
                 ['Discord Enabled', config('sentinel.discord.enabled') ? 'Yes' : 'No'],
                 ['Discord Webhook', config('sentinel.discord.webhook_url') ? 'Configured' : 'Not set'],
                 ['Discord Level', config('sentinel.discord.level', 'debug')],
+                ['Webhook Enabled', config('sentinel.webhook.enabled') ? 'Yes' : 'No'],
+                ['Webhook Endpoint', config('sentinel.webhook.endpoint_url') ? 'Configured' : 'Not set'],
+                ['Webhook Level', config('sentinel.webhook.level', 'debug')],
                 ['Sentry Enabled', config('sentinel.sentry.enabled') ? 'Yes' : 'No'],
                 ['Database Enabled', config('sentinel.database.enabled') ? 'Yes' : 'No'],
                 ['Async Enabled', config('sentinel.async.enabled') ? 'Yes' : 'No'],
@@ -64,9 +67,10 @@ class TestMonitoringCommand extends Command
 
         $hasSlack = config('sentinel.slack.enabled') && config('sentinel.slack.webhook_url');
         $hasDiscord = config('sentinel.discord.enabled') && config('sentinel.discord.webhook_url');
+        $hasWebhook = config('sentinel.webhook.enabled') && config('sentinel.webhook.endpoint_url') && config('sentinel.webhook.secret');
 
-        if (! $hasSlack && ! $hasDiscord) {
-            $this->error('No webhook URL configured. Set SENTINEL_SLACK_WEBHOOK or SENTINEL_DISCORD_WEBHOOK');
+        if (! $hasSlack && ! $hasDiscord && ! $hasWebhook) {
+            $this->error('No channel configured. Set SENTINEL_SLACK_WEBHOOK, SENTINEL_DISCORD_WEBHOOK, or SENTINEL_ENDPOINT + SENTINEL_WEBHOOK_SECRET');
 
             return self::FAILURE;
         }
@@ -81,6 +85,10 @@ class TestMonitoringCommand extends Command
 
         if ($hasDiscord) {
             $webhookOk = $this->testDiscordWebhook() && $webhookOk;
+        }
+
+        if ($hasWebhook) {
+            $webhookOk = $this->testCustomWebhook() && $webhookOk;
         }
 
         if (! $webhookOk) {
@@ -182,6 +190,52 @@ class TestMonitoringCommand extends Command
             return false;
         } catch (Throwable $e) {
             $this->line('  <error>✗</error> Discord webhook: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * Test custom webhook endpoint with a signed HTTP call.
+     */
+    protected function testCustomWebhook(): bool
+    {
+        $url = config('sentinel.webhook.endpoint_url');
+        $secret = config('sentinel.webhook.secret');
+
+        try {
+            $payload = json_encode([
+                'message' => 'Sentinel connectivity test',
+                'level' => 'info',
+                'event_type' => 'test',
+                'timestamp' => now()->format('c'),
+            ], JSON_UNESCAPED_SLASHES);
+
+            $signature = hash_hmac('sha256', (string) $payload, (string) $secret);
+
+            $client = new Client(['timeout' => 5]);
+            $response = $client->post($url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'X-Sentinel-Signature' => $signature,
+                    'X-Sentinel-Timestamp' => (string) time(),
+                ],
+                'body' => $payload,
+            ]);
+
+            $status = $response->getStatusCode();
+
+            if ($status >= 200 && $status < 300) {
+                $this->line('  <info>✓</info> Custom webhook: OK (HTTP ' . $status . ')');
+
+                return true;
+            }
+
+            $this->line('  <error>✗</error> Custom webhook: HTTP ' . $status);
+
+            return false;
+        } catch (Throwable $e) {
+            $this->line('  <error>✗</error> Custom webhook: ' . $e->getMessage());
 
             return false;
         }

@@ -213,8 +213,9 @@ class MonitoringService
     {
         $hasSlack = config('sentinel.slack.enabled', true) && config('sentinel.slack.webhook_url');
         $hasDiscord = config('sentinel.discord.enabled', false) && config('sentinel.discord.webhook_url');
+        $hasWebhook = config('sentinel.webhook.enabled', false) && config('sentinel.webhook.endpoint_url') && config('sentinel.webhook.secret');
 
-        if (! $hasSlack && ! $hasDiscord) {
+        if (! $hasSlack && ! $hasDiscord && ! $hasWebhook) {
             return;
         }
 
@@ -266,6 +267,15 @@ class MonitoringService
                 Log::channel('sentinel-discord')->{$level}($message, $context);
             } catch (Throwable $e) {
                 Log::warning('[Sentinel] Discord notification failed: ' . $e->getMessage());
+            }
+        }
+
+        // Log to custom webhook
+        if (config('sentinel.webhook.enabled', false) && config('sentinel.webhook.endpoint_url') && config('sentinel.webhook.secret')) {
+            try {
+                Log::channel('sentinel-webhook')->{$level}($message, $context);
+            } catch (Throwable $e) {
+                Log::warning('[Sentinel] Webhook notification failed: ' . $e->getMessage());
             }
         }
     }
