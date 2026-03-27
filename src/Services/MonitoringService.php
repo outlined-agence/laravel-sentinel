@@ -28,8 +28,8 @@ class MonitoringService
 
     public function __construct(ContextBuilder $contextBuilder, ?ContextSanitizer $sanitizer = null)
     {
-        $this->enabled = config('sentinel.enabled', true);
-        $this->databaseEnabled = config('sentinel.database.enabled', false);
+        $this->enabled = (bool) config('sentinel.enabled', true);
+        $this->databaseEnabled = (bool) config('sentinel.database.enabled', false);
         $this->contextBuilder = $contextBuilder;
         $this->sanitizer = $sanitizer ?? new ContextSanitizer();
 
@@ -255,8 +255,8 @@ class MonitoringService
         if (config('sentinel.slack.enabled', true) && config('sentinel.slack.webhook_url')) {
             try {
                 Log::channel('sentinel-slack')->{$level}($message, $context);
-            } catch (Throwable) {
-                // Fail silently
+            } catch (Throwable $e) {
+                Log::warning('[Sentinel] Slack notification failed: ' . $e->getMessage());
             }
         }
 
@@ -264,8 +264,8 @@ class MonitoringService
         if (config('sentinel.discord.enabled', false) && config('sentinel.discord.webhook_url')) {
             try {
                 Log::channel('sentinel-discord')->{$level}($message, $context);
-            } catch (Throwable) {
-                // Fail silently
+            } catch (Throwable $e) {
+                Log::warning('[Sentinel] Discord notification failed: ' . $e->getMessage());
             }
         }
     }
@@ -292,8 +292,16 @@ class MonitoringService
                 'url' => $context['request']['url'] ?? null,
                 'environment' => $context['environment']['app_env'] ?? null,
             ]);
-        } catch (Throwable) {
-            // Fail silently - database might not be migrated yet
+        } catch (Throwable $e) {
+            if (! app()->isProduction()) {
+                throw new \RuntimeException(
+                    'Sentinel database storage failed. Run: php artisan migrate. ' . $e->getMessage(),
+                    0,
+                    $e,
+                );
+            }
+
+            Log::warning('[Sentinel] Database storage failed: ' . $e->getMessage());
         }
     }
 

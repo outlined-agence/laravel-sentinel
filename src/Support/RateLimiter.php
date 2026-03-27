@@ -23,9 +23,9 @@ class RateLimiter
     {
         $store = config('sentinel.rate_limit.cache_store');
         $this->cache = $store ? Cache::store($store) : Cache::store();
-        $this->enabled = config('sentinel.rate_limit.enabled', true);
-        $this->maxPerMinute = config('sentinel.rate_limit.max_per_minute', 30);
-        $this->maxPerHour = config('sentinel.rate_limit.max_per_hour', 200);
+        $this->enabled = (bool) config('sentinel.rate_limit.enabled', true);
+        $this->maxPerMinute = (int) config('sentinel.rate_limit.max_per_minute', 30);
+        $this->maxPerHour = (int) config('sentinel.rate_limit.max_per_hour', 200);
     }
 
     /**

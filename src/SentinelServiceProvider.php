@@ -77,6 +77,9 @@ class SentinelServiceProvider extends ServiceProvider
         $this->app->singleton(ResourceChecker::class, function ($app) {
             return new ResourceChecker($app[MonitoringService::class]);
         });
+
+        // Register alias for app('sentinel')
+        $this->app->alias(MonitoringService::class, 'sentinel');
     }
 
     /**
@@ -89,6 +92,7 @@ class SentinelServiceProvider extends ServiceProvider
         $this->registerLogChannels();
         $this->registerViews();
         $this->registerFilament();
+        $this->validateConfig();
     }
 
     /**
@@ -152,14 +156,14 @@ class SentinelServiceProvider extends ServiceProvider
         $this->app['config']->set('logging.channels.sentinel-slack', [
             'driver' => 'custom',
             'via' => SlackLogger::class,
-            'level' => 'warning',
+            'level' => config('sentinel.slack.level', 'debug'),
         ]);
 
         // Register Discord channel
         $this->app['config']->set('logging.channels.sentinel-discord', [
             'driver' => 'custom',
             'via' => DiscordLogger::class,
-            'level' => 'warning',
+            'level' => config('sentinel.discord.level', 'debug'),
         ]);
     }
 
@@ -204,4 +208,21 @@ class SentinelServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Validate configuration and warn about common misconfigurations.
+     */
+    protected function validateConfig(): void
+    {
+        if (! config('sentinel.enabled')) {
+            return;
+        }
+
+        if (config('sentinel.slack.enabled') && empty(config('sentinel.slack.webhook_url'))) {
+            Log::warning('[Sentinel] Slack is enabled but SENTINEL_SLACK_WEBHOOK is not set. Slack notifications will not be sent.');
+        }
+
+        if (config('sentinel.discord.enabled') && empty(config('sentinel.discord.webhook_url'))) {
+            Log::warning('[Sentinel] Discord is enabled but SENTINEL_DISCORD_WEBHOOK is not set. Discord notifications will not be sent.');
+        }
+    }
 }
