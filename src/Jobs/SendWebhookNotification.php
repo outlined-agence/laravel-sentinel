@@ -54,6 +54,15 @@ class SendWebhookNotification implements ShouldQueue
                 // Fail silently
             }
         }
+
+        // Log to custom webhook
+        if (config('sentinel.webhook.enabled', false) && config('sentinel.webhook.endpoint_url') && config('sentinel.webhook.secret')) {
+            try {
+                Log::channel('sentinel-webhook')->{$this->level}($this->message, $this->context);
+            } catch (Throwable) {
+                // Fail silently
+            }
+        }
     }
 
     /**
