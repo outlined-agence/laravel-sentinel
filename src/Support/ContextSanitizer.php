@@ -18,7 +18,7 @@ class ContextSanitizer
 
     public function __construct()
     {
-        $this->enabled = config('sentinel.sanitization.enabled', true);
+        $this->enabled = (bool) config('sentinel.sanitization.enabled', true);
         $this->mask = config('sentinel.sanitization.mask', '********');
         $this->sensitiveFields = config('sentinel.sanitization.fields', [
             'password',

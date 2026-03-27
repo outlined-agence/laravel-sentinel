@@ -30,8 +30,8 @@ class AlertDeduplicator
         $store = config('sentinel.deduplication.cache_store');
         $this->cache = $store ? Cache::store($store) : Cache::store();
         $this->prefix = config('sentinel.deduplication.cache_prefix', 'sentinel_alert_');
-        $this->defaultTtl = config('sentinel.deduplication.ttl', 3600);
-        $this->enabled = config('sentinel.deduplication.enabled', true);
+        $this->defaultTtl = (int) config('sentinel.deduplication.ttl', 3600);
+        $this->enabled = (bool) config('sentinel.deduplication.enabled', true);
     }
 
     /**

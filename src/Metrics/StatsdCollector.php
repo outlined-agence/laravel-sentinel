@@ -31,7 +31,7 @@ class StatsdCollector implements MetricsCollector
     public function __construct()
     {
         $this->host = config('sentinel.metrics.statsd.host', '127.0.0.1');
-        $this->port = config('sentinel.metrics.statsd.port', 8125);
+        $this->port = (int) config('sentinel.metrics.statsd.port', 8125);
         $this->protocol = config('sentinel.metrics.statsd.protocol', 'udp');
         $this->prefix = config('sentinel.metrics.prefix', 'sentinel');
     }

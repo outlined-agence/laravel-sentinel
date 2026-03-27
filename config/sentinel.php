@@ -61,6 +61,7 @@ return [
         'icon_emoji' => env('SENTINEL_SLACK_EMOJI', ':shield:'),
         'mention_user_id' => env('SENTINEL_SLACK_MENTION_ID'),
         'mention_on_levels' => ['critical', 'alert', 'emergency'],
+        'level' => env('SENTINEL_SLACK_LEVEL', 'debug'),
         'timeout' => 5,
     ],
 
@@ -80,6 +81,7 @@ return [
         'avatar_url' => env('SENTINEL_DISCORD_AVATAR'),
         'mention_role_id' => env('SENTINEL_DISCORD_MENTION_ROLE'),
         'mention_on_levels' => ['critical', 'alert', 'emergency'],
+        'level' => env('SENTINEL_DISCORD_LEVEL', 'debug'),
         'timeout' => 5,
     ],
 

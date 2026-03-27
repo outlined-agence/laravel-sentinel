@@ -25,6 +25,10 @@ class SentinelPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
+        if (! config('sentinel.filament.enabled', true)) {
+            return;
+        }
+
         if ($this->hasResource) {
             $panel->resources([
                 $this->getResourceClass(),
